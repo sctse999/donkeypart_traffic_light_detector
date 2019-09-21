@@ -10,12 +10,11 @@ git submodule add https://github.com/sctse999/donkeypart_traffic_light_detector.
 
 ### Install Coral TPU on Pi
 
-Follow instruction to install and setup Google Coral on Pi 4
-
-TODO: Medium link here
+Follow [this instruction on medium](https://medium.com/@jonathantse/setting-up-google-coral-usb-accelerator-on-raspberry-pi-4-for-donkey-car-706f33e575a9) to install and setup Google Coral on Pi 4
 
 
-### Add to manage.py
+
+### Add code to manage.py
 
 Add the following code
 ```
