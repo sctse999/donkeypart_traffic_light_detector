@@ -52,6 +52,19 @@ def test_detect_traffic_light_2():
     assert traffic_light_obj is None
 
 
+def test_is_light_on():
+    tld = TrafficLightDetector()
+
+    img = cv2.imread(red_light_jpg_path)
+
+    traffic_light_obj = DetectionCandidate(9, 0.21, 277.77144909, 74.24615622, 301.41475201, 108.47412944)
+
+    crop_img_arr = tld.crop_traffic_light(img, traffic_light_obj)
+    cv2.imwrite("light_only.jpg", crop_img_arr)
+
+
+    assert tld.is_light_on(crop_img_arr) == True
+
 def test_crop_traffic_light():
     tld = TrafficLightDetector()
 

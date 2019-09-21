@@ -10,5 +10,8 @@ class ImageResizer(object):
 
 
     def run(self, img_arr):
+        if img_arr is None:
+            return img_arr, img_arr
+
         resized_img_arr = cv2.resize(img_arr, (160,120))
         return img_arr, resized_img_arr

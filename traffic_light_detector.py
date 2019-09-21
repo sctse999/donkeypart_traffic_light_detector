@@ -7,6 +7,8 @@ from edgetpu.detection.engine import DetectionEngine
 from edgetpu.utils import dataset_utils
 from PIL import Image
 from matplotlib import cm
+import os
+import urllib.request
 
 
 class TrafficLightDetector(object):
@@ -30,15 +32,26 @@ class TrafficLightDetector(object):
 
     '''
 
-    # MODEL_URL = "https://dl.google.com/coral/canned_models/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite"
-    # LABEL_URL =
+    def download_file(self, url, filename):
+        if not os.path.isfile(filename):
+            urllib.request.urlretrieve(url, filename)
+
 
     def __init__(self):
-        model = "/home/jonathantse/Downloads/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite"
-        label = "/home/jonathantse/Downloads/coco_labels.txt"
+        MODEL_FILE_NAME = "mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite"
+        LABEL_FILE_NAME = "coco_labels.txt"
+
+        MODEL_URL = "https://dl.google.com/coral/canned_models/mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite"
+        LABEL_URL = "https://dl.google.com/coral/canned_models/coco_labels.txt"
+
+
+        self.download_file(MODEL_URL, MODEL_FILE_NAME)
+        self.download_file(LABEL_URL, LABEL_FILE_NAME)
+
+
         self.last_5_scores = collections.deque(np.zeros(5), maxlen=5)
-        self.engine = DetectionEngine(model)
-        self.labels = dataset_utils.ReadLabelFile(label)
+        self.engine = DetectionEngine(MODEL_FILE_NAME)
+        self.labels = dataset_utils.ReadLabelFile(LABEL_FILE_NAME)
 
         self.TRAFFIC_LIGHT_CLASS = 9
         self.LAST_5_SCORE_THRESHOLD = 0.4
@@ -74,6 +87,7 @@ class TrafficLightDetector(object):
         if traffic_light_obj:
             self.last_5_scores.append(traffic_light_obj.score)
             sum_of_last_5_score = sum(list(self.last_5_scores))
+            # print("sum of last 5 score = ", sum_of_last_5_score)
 
             if sum_of_last_5_score > self.LAST_5_SCORE_THRESHOLD:
                 return traffic_light_obj
@@ -81,6 +95,7 @@ class TrafficLightDetector(object):
                 print("Not reaching last 5 score threshold")
                 return None
         else:
+            self.last_5_scores.append(0)
             return None
 
         return traffic_light_obj
@@ -100,8 +115,14 @@ class TrafficLightDetector(object):
         return img_arr[y1:y2, x1:x2]
 
     def is_light_on(self, img_arr):
-        img_gray = cv2.cvtColor(img_arr, cv2.COLOR_BGR2GRAY)
-        ret, img_thresh = cv2.threshold(img_gray, 200, 255, cv2.THRESH_BINARY)
+
+        cv2.imwrite("upper_red_light.jpg",img_arr)
+        img_gray = cv2.cvtColor(img_arr, cv2.COLOR_RGB2GRAY)
+        ret, img_thresh = cv2.threshold(img_gray, 210, 255, cv2.THRESH_BINARY)
+
+        cv2.imwrite("upper_red_light_thresh.jpg",img_thresh)
+
+        print("cv2.countNonZero = ", cv2.countNonZero(img_thresh))
 
         if cv2.countNonZero(img_thresh) > 0:
             return True
@@ -117,26 +138,38 @@ class TrafficLightDetector(object):
 
     def run(self, img_arr, throttle, debug=False):
         if img_arr is None:
-            return False, img_arr
+            return throttle, img_arr
 
         if debug:
             cv2.imshow("img {}".format(random.randint(1, 10000)), img_arr)
-        #     cv2.waitKey()
 
         # Detect traffic light object
         traffic_light_obj = self.detect_traffic_light(img_arr)
 
         if traffic_light_obj:
             print(traffic_light_obj.score)
+
+            xmargin  =( traffic_light_obj.bounding_box[1][0] - traffic_light_obj.bounding_box[0][0]) *0.1
+
+            traffic_light_obj.bounding_box[0][0] = traffic_light_obj.bounding_box[0][0] + xmargin
+            traffic_light_obj.bounding_box[1][0] = traffic_light_obj.bounding_box[1][0] - xmargin
+
+            ymargin = ( traffic_light_obj.bounding_box[1][1] - traffic_light_obj.bounding_box[0][1]) *0.05
+
+            traffic_light_obj.bounding_box[0][1] = traffic_light_obj.bounding_box[0][1] + ymargin
+            traffic_light_obj.bounding_box[1][1] = traffic_light_obj.bounding_box[1][1] - ymargin
+
+
             cv2.rectangle(img_arr, tuple(traffic_light_obj.bounding_box[0].astype(int)),
                           tuple(traffic_light_obj.bounding_box[1].astype(int)), (0, 255, 0), 2)
 
             traffic_light_img = self.crop_traffic_light(
                 img_arr, traffic_light_obj)
 
-            upper_half_img_arr = self.crop_upper_half(img_arr)
+            upper_half_img_arr = self.crop_upper_half(traffic_light_img)
 
             if self.is_light_on(upper_half_img_arr):
+                # print("Red light detected, overriding throttle to 0")
                 throttle = 0
 
         return throttle, img_arr
